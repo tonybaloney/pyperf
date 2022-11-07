@@ -58,7 +58,7 @@ def main():
         'author_email': 'vstinner@redhat.com',
         'classifiers': CLASSIFIERS,
         'packages': ['pyperf', 'pyperf.tests'],
-        'install_requires': [],
+        'install_requires': ["pluggy"],
         # don't use environment markers in install_requires, but use weird
         # syntax of extras_require, to support setuptools 18
         'entry_points': {

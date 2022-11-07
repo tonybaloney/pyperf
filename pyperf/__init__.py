@@ -1,11 +1,13 @@
 from time import perf_counter
+import pluggy
 
+"""Marker to be imported and used in plugins (and for own implementations)"""
 VERSION = (2, 5, 0)
 __version__ = '.'.join(map(str, VERSION))
 
 # Export pyperf.perf_counter for backward compatibility with pyperf 1.7
 # which supports Python 2 and Python 3
-__all__ = ['perf_counter']
+__all__ = ['hookimpl', 'perf_counter']
 
 from pyperf._utils import python_implementation, python_has_jit  # noqa
 __all__.extend(('python_implementation', 'python_has_jit'))
@@ -18,3 +20,5 @@ __all__.extend(('Run', 'Benchmark', 'BenchmarkSuite', 'add_runs'))
 
 from pyperf._runner import Runner   # noqa
 __all__.append('Runner')
+
+hookimpl = pluggy.HookimplMarker("pyperf")

@@ -2,6 +2,7 @@ import functools
 import os
 import sys
 import time
+import pluggy
 
 import pyperf
 from pyperf._cli import (format_benchmark, format_checks,
@@ -15,6 +16,7 @@ from pyperf._utils import (MS_WINDOWS, MAC_OS, abs_executable,
                            WritePipe, get_python_names,
                            merge_profile_stats)
 from pyperf._worker import WorkerProcessTask
+from pyperf import hookspecs
 
 
 def strictly_positive(value):
@@ -60,6 +62,13 @@ def profiling_wrapper(func):
         return profiler.runcall(func, *args)
 
     return profiler, profiling_func
+
+
+def get_plugin_manager():
+    pm = pluggy.PluginManager("pyperf")
+    pm.add_hookspecs(hookspecs)
+    pm.load_setuptools_entrypoints("pyperf")
+    return pm
 
 
 class CLIError(Exception):
@@ -255,6 +264,7 @@ class Runner:
                             help='Track memory usage using a thread')
 
         self.argparser = parser
+        self.hook = get_plugin_manager().hook
 
     def _multiline_output(self):
         return self.args.verbose or multiline_output(self.args)
@@ -486,7 +496,10 @@ class Runner:
             profiler, time_func = profiling_wrapper(time_func)
 
         def task_func(task, loops):
-            return time_func(loops, *args)
+            self.hook.before_func()
+            result = time_func(loops, *args)
+            self.hook.after_func()
+            return result
 
         task = WorkerProcessTask(self, name, task_func, metadata)
 
@@ -516,6 +529,7 @@ class Runner:
 
         def task_func(task, loops):
             # use fast local variables
+            self.hook.before_func()
             local_timer = time.perf_counter
             local_func = func
             if loops != 1:
@@ -529,7 +543,7 @@ class Runner:
                 t0 = local_timer()
                 local_func()
                 dt = local_timer() - t0
-
+            self.hook.after_func()
             return dt
 
         task = WorkerProcessTask(self, name, task_func, metadata)
@@ -560,6 +574,7 @@ class Runner:
         def task_func(task, loops):
             if loops != 1:
                 async def main():
+                    self.hook.before_func()
                     # use fast local variables
                     local_timer = time.perf_counter
                     local_func = func
@@ -569,9 +584,11 @@ class Runner:
                     for _ in range_it:
                         await local_func()
                     dt = local_timer() - t0
+                    self.hook.after_func()
                     return dt
             else:
                 async def main():
+                    self.hook.before_func()
                     # use fast local variables
                     local_timer = time.perf_counter
                     local_func = func
@@ -579,6 +596,7 @@ class Runner:
                     t0 = local_timer()
                     await local_func()
                     dt = local_timer() - t0
+                    self.hook.after_func()
                     return dt
 
             import asyncio
